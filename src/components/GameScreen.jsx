@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Modal, Divider } from 'animal-island-ui';
 import { useGame, events, LOCATIONS, TIME_PERIODS, ITEM_DB, NPC_DB } from '../state/GameContext.jsx';
 import storylines from '../data/storylines.js';
+import { getBestPrompt, getScenePrompt, SPECIAL_PROMPTS } from '../data/imagePrompts.js';
 import { ATTR_NAMES, ATTR_ICONS } from '../data/constants.js';
 
 const SCENE_BG = {
@@ -31,6 +32,11 @@ export default function GameScreen() {
   } = useGame();
 
   const msgEnd = useRef(null);
+  const isNight = state.period === 4; // 夜晚
+  const canAct = !isNight || (state.activeStoryline); // 夜晚只能做剧情或休息
+  const timeLabel = TIME_PERIODS[state.period];
+  const periodKey = state.period;
+
   const msgAreaRef = useRef(null);
   const [showShop, setShowShop] = useState(false);
   const [showInv, setShowInv] = useState(false);
@@ -86,8 +92,11 @@ export default function GameScreen() {
   }, [state.transmuteProgress, state.transmuted]);
 
   const pushMsg = useCallback((text, cls = 'story') => {
-    setRenderedMsgs(prev => [...prev, { text, cls, id: Date.now() + Math.random() }]);
-  }, []);
+    const now = new Date();
+    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const label = `🕐${ts} ${TIME_PERIODS[state.period]}·第${state.day}天`;
+    setRenderedMsgs(prev => [...prev, { text, cls, label, id: Date.now() + Math.random() }]);
+  }, [state.period, state.day]);
 
   // Storyline choice resolution
   const resolveStorylineChoice = useCallback((sl, step, choice) => {
@@ -199,6 +208,12 @@ export default function GameScreen() {
     click();
     initAudio();
 
+    // Night restriction — only rest allowed, unless in a storyline
+    if (isNight && locAction !== 'rest' && !state.activeStoryline) {
+      pushMsg('🌙 夜深了，该休息了。只有在特殊剧情中才能夜间行动。', 'failure');
+      return;
+    }
+
     // Daily action limit
     if (state.actionsToday >= MAX_ACTIONS_PER_DAY) {
       pushMsg('今日已劳累过度，请休息或等待明日再行动。', 'failure');
@@ -210,7 +225,13 @@ export default function GameScreen() {
     if (locAction === 'shop') { setShowShop(true); return; }
 
     const actionMessages = {
-      rest:       () => { pushMsg('你在家中休息，恢复了精力。', 'story'); dispatch({ type:'SET_ENERGY', delta:25 }); },
+      rest:       () => {
+        if (isNight) pushMsg('🌙 夜深人静，你安然入睡。一夜好眠后精力充沛。', 'story');
+        else pushMsg('你在家中休息，恢复了精力。', 'story');
+        dispatch({ type:'SET_ENERGY', delta:25 });
+        // At night, rest advances to next morning
+        if (isNight) advanceTime(1);
+      },
       study_room: () => { pushMsg('你在书阁翻阅古籍，安安静静地读了一会儿书。(智力+1)', 'success'); dispatch({ type:'UPDATE_ATTRS', changes:{intelligence:Math.min(10,state.attrs.intelligence+1)} }); },
       garden:     () => {
         const r = Math.random();
@@ -281,6 +302,7 @@ export default function GameScreen() {
 
   const moveTo = useCallback((locId) => {
     if (state.location === locId) return;
+    if (isNight && !state.activeStoryline) { pushMsg('🌙 夜深不宜外出，明早再出发吧。', 'failure'); return; }
     if (state.actionsToday >= MAX_ACTIONS_PER_DAY) { pushMsg('今日已劳累过度，无法移动。', 'failure'); return; }
     click();
     dispatch({ type: 'SET_LOCATION', loc: locId });
@@ -321,16 +343,20 @@ export default function GameScreen() {
         </div>
         <div className="scene-label">
           {LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {TIME_PERIODS[state.period]} · {state.actionsToday}/{MAX_ACTIONS_PER_DAY}动
+          {isNight && !state.activeStoryline ? ' 🌙休息' : ''}
         </div>
-        <div style={{ position:'absolute', bottom: 30, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13, letterSpacing: 2 }}>
-          {SCENE_DESC[state.location]}
+        <div style={{ position:'absolute', bottom: 26, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 11, letterSpacing: 1, padding: '0 40px' }}>
+          {getScenePrompt(state.location, TIME_PERIODS[state.period]).substring(0, 80)}...
         </div>
       </div>
 
       {/* Message Area */}
       <div className="msg-area" ref={msgAreaRef} onClick={initAudio}>
         {renderedMsgs.map(m => (
-          <div key={m.id} className={`msg ${m.cls}`}>{m.text}</div>
+          <div key={m.id}>
+            <div style={{ fontSize:10, color:'rgba(184,168,138,0.5)', marginBottom:1, paddingLeft:4 }}>{m.label}</div>
+            <div className={`msg ${m.cls}`}>{m.text}</div>
+          </div>
         ))}
 
         {/* Pending Event Choices */}
