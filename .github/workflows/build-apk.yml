@@ -17,7 +17,6 @@ jobs:
           cp index.html www/
           cp manifest.json www/
           cp sw.js www/
-          ls -la www/
 
       - name: Create capacitor config
         run: |
@@ -52,6 +51,27 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Patch duplicate class issue
+        run: |
+          # Fix gradle.properties
+          echo "android.defaults.buildfeatures.buildconfig=true" >> android/gradle.properties
+          echo "android.nonTransitiveRClass=true" >> android/gradle.properties
+          # Fix build.gradle
+          cat >> android/app/build.gradle << 'PATCH'
+
+          configurations.all {
+              resolutionStrategy {
+                  preferProjectModules()
+              }
+          }
+          android {
+              packagingOptions {
+                  pickFirsts += ['**/*.so']
+                  excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
+              }
+          }
+          PATCH
+
       - name: Sync web assets
         run: npx cap sync android
 
@@ -59,7 +79,7 @@ jobs:
         working-directory: ./android
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
