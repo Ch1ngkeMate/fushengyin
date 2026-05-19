@@ -1,0 +1,93 @@
+.app-root {
+  height: 100%; max-width: 480px; margin: 0 auto;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: #1a1a2e; color: #e0d5c1;
+}
+/* Override animal-island-ui default bg for game dark theme */
+.app-root .card, .app-root [class*="animal-card"] {
+  background: #16213e !important; color: #e0d5c1 !important;
+}
+.scene-img-container {
+  width: 100%; height: 180px; flex-shrink: 0;
+  background: #0f3460; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 48px; color: rgba(255,255,255,0.3);
+}
+.scene-img-container img {
+  width: 100%; height: 100%; object-fit: cover; position: absolute;
+}
+.scene-label {
+  position: absolute; bottom: 6px; left: 10px;
+  background: rgba(0,0,0,0.65); color: #d4a574;
+  padding: 3px 10px; border-radius: 4px; font-size: 12px;
+  z-index: 1;
+}
+.msg-area {
+  flex: 1; overflow-y: auto; padding: 8px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.msg {
+  margin-bottom: 6px; padding: 6px 10px; border-radius: 6px;
+  font-size: 14px; line-height: 1.7;
+  animation: msgIn 0.25s ease;
+}
+@keyframes msgIn { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+.msg.system { background: rgba(15,52,96,0.5); color: #b8a88a; font-size: 12px; }
+.msg.story { background: rgba(26,26,46,0.8); color: #e0d5c1; border-left: 3px solid #d4a574; }
+.msg.success { background: rgba(90,158,111,0.2); color: #8ec99c; border-left: 3px solid #5a9e6f; }
+.msg.failure { background: rgba(196,77,77,0.2); color: #e09090; border-left: 3px solid #c44d4d; }
+.msg.magic { background: rgba(123,94,167,0.2); color: #b8a0d8; border-left: 3px solid #7b5ea7; }
+.bottom-panel {
+  flex-shrink: 0; background: #16213e; border-top: 2px solid #3a3040;
+}
+.quick-stats {
+  display: flex; justify-content: space-around; padding: 4px 6px;
+  background: #0f3460; font-size: 11px; color: #b8a88a;
+  flex-wrap: wrap; gap: 2px;
+}
+.quick-stats span { color: #d4a574; font-weight: bold; }
+.action-row {
+  display: flex; gap: 4px; padding: 6px; flex-wrap: wrap;
+  justify-content: center;
+}
+.loc-row {
+  display: flex; overflow-x: auto; padding: 4px 6px; gap: 3px;
+  background: #1a1a2e; border-top: 1px solid #3a3040;
+  -webkit-overflow-scrolling: touch;
+}
+.loc-tab {
+  padding: 6px 10px; border-radius: 20px; background: #2a2a4a;
+  border: 1px solid #3a3040; color: #b8a88a; font-size: 11px;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: all 0.2s; font-family: inherit;
+}
+.loc-tab.active { background: #0f3460; border-color: #d4a574; color: #d4a574; }
+.choice-list { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
+.choice-btn {
+  padding: 8px 10px; background: rgba(212,165,116,0.08);
+  border: 1px solid #3a3040; color: #e8c9a0; border-radius: 6px;
+  cursor: pointer; text-align: left; font-size: 13px; transition: all 0.2s;
+  font-family: inherit;
+}
+.choice-btn:active { background: rgba(212,165,116,0.2); border-color: #d4a574; }
+.title-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100%; gap: 12px; padding: 20px;
+  text-align: center;
+}
+.title-wrap h1 { font-size: 36px; color: #d4a574; letter-spacing: 6px; }
+.title-wrap .sub { color: #b8a88a; font-size: 14px; }
+.create-wrap { height: 100%; overflow-y: auto; padding: 16px; }
+.create-wrap h2 { text-align: center; color: #d4a574; margin-bottom: 12px; }
+.attr-row { display: flex; align-items: center; margin: 6px 0; gap: 8px; }
+.attr-row .attr-name { width: 70px; color: #e8c9a0; font-size: 13px; }
+.attr-row .attr-desc { width: 60px; font-size: 11px; color: #b8a88a; }
+.attr-row .ctrl { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.attr-row .ctrl button {
+  width: 30px; height: 30px; border-radius: 50%; border: 1px solid #d4a574;
+  background: #2a2a4a; color: #d4a574; font-size: 18px; cursor: pointer;
+}
+.attr-row .ctrl .val { width: 24px; text-align: center; color: #d4a574; font-weight: bold; }
+.ending-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 30px; text-align: center; gap: 16px; }
+.ending-wrap h2 { font-size: 24px; color: #d4a574; letter-spacing: 3px; }
+.ending-wrap p { color: #b8a88a; line-height: 1.8; }

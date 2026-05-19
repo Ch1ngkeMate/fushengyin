@@ -11,12 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare web directory
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install & Build
         run: |
-          mkdir -p www
-          cp index.html www/
-          cp manifest.json www/
-          cp sw.js www/
+          npm install
+          npm run build
 
       - name: Create capacitor config
         run: |
@@ -24,17 +27,12 @@ jobs:
           {
             "appId": "com.fushengyin.game",
             "appName": "浮生引",
-            "webDir": "www",
+            "webDir": "dist",
             "bundledWebRuntime": false
           }
           CONF
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
