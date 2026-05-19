@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Modal, Divider } from 'animal-island-ui';
 import { useGame, events, LOCATIONS, TIME_PERIODS, ITEM_DB, NPC_DB } from '../state/GameContext.jsx';
+import storylines from '../data/storylines.js';
 import { ATTR_NAMES, ATTR_ICONS } from '../data/constants.js';
 
 const SCENE_BG = {
@@ -25,7 +26,7 @@ const MAX_ACTIONS_PER_DAY = 8;
 export default function GameScreen() {
   const {
     state, dispatch, sfx, addMsg, skillCheck, applyEffects,
-    advanceTime, triggerRandomEvent, checkEndings, saveGame, loadGame,
+    advanceTime, triggerRandomEvent, checkEndings, checkForStorylines, saveGame, loadGame,
     playTone, initAudio,
   } = useGame();
 
@@ -88,7 +89,60 @@ export default function GameScreen() {
     setRenderedMsgs(prev => [...prev, { text, cls, id: Date.now() + Math.random() }]);
   }, []);
 
+  // Storyline choice resolution
+  const resolveStorylineChoice = useCallback((sl, step, choice) => {
+    if (choice.cost && state.gold < choice.cost) { pushMsg('银两不够！', 'failure'); return; }
+    if (choice.check) {
+      const r = skillCheck(choice.check.attr, choice.check.dc);
+      pushMsg(r.text, 'system');
+      if (r.success) {
+        successSfx();
+        if (choice.success) { pushMsg(choice.success.msg, 'success'); applyEffects(choice.success); }
+      } else {
+        failSfx();
+        if (choice.failure) { pushMsg(choice.failure.msg, 'failure'); applyEffects(choice.failure); }
+      }
+    } else if (choice.msg) {
+      pushMsg(choice.msg, 'story');
+      applyEffects(choice);
+    }
+    applyEffects(choice);
+
+    if (choice.endStory) {
+      dispatch({ type: 'END_STORYLINE' });
+      advanceTime(2);
+    } else if (choice.next !== undefined) {
+      dispatch({ type: 'ADVANCE_STORYLINE' });
+      advanceTime(1);
+    }
+  }, [state.gold, skillCheck, applyEffects, pushMsg, successSfx, failSfx, dispatch, advanceTime]);
+
+  // Show storyline step
+  useEffect(() => {
+    if (state.activeStoryline) {
+      const sl = storylines.find(s => s.id === state.activeStoryline.id);
+      if (sl) {
+        const step = sl.steps[state.activeStoryline.step];
+        if (step) {
+          pushMsg(`📜 ${sl.title} (${state.activeStoryline.step + 1}/${sl.steps.length})`, 'magic');
+          pushMsg(step.text, 'story');
+          setPendingEvent({ ...step, isStoryline: true, storylineId: sl.id });
+        } else {
+          dispatch({ type: 'END_STORYLINE' });
+        }
+      }
+    }
+  }, [state.activeStoryline?.step]);
+
   const resolveChoice = useCallback((evt, choice) => {
+    if (evt.isStoryline) {
+      const sl = storylines.find(s => s.id === evt.storylineId);
+      if (sl) {
+        resolveStorylineChoice(sl, sl.steps[state.activeStoryline?.step || 0], choice);
+        setPendingEvent(null);
+        return;
+      }
+    }
     if (choice.msg === 'TRANSMUTE') {
       magicSfx();
       dispatch({ type: 'TRIGGER_TRANSMUTE' });
@@ -214,8 +268,11 @@ export default function GameScreen() {
 
     if (!pendingEvent) {
       advanceTime(1);
-      // Random event after action
-      if (Math.random() < 0.3) {
+      // Check for storylines first (higher priority)
+      const sl = checkForStorylines();
+      if (sl) {
+        dispatch({ type: 'START_STORYLINE', id: sl.id });
+      } else if (Math.random() < 0.25) {
         const e = triggerRandomEvent(state.location);
         if (e) triggerEvent(e);
       }

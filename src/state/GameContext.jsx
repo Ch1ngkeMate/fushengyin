@@ -4,6 +4,7 @@ import { NPC_DB } from '../data/npcs.js';
 import { LOCATIONS, TIME_PERIODS } from '../data/constants.js';
 import events from '../data/events.js';
 import { ENDINGS } from '../data/endings.js';
+import storylines from '../data/storylines.js';
 
 const GameContext = createContext(null);
 
@@ -25,6 +26,8 @@ const initialState = {
   messages: [],
   eventQueue: [],
   ending: null,
+  activeStoryline: null,  // { id, step, data }
+  completedStorylines: [],
 };
 
 function reducer(state, action) {
@@ -114,6 +117,12 @@ function reducer(state, action) {
         affections: { ...state.affections, mentor: 20 },
         location: 'mystic',
       };
+    case 'START_STORYLINE':
+      return { ...state, activeStoryline: { id: action.id, step: 0 } };
+    case 'ADVANCE_STORYLINE':
+      return { ...state, activeStoryline: { ...state.activeStoryline, step: state.activeStoryline.step + 1 } };
+    case 'END_STORYLINE':
+      return { ...state, activeStoryline: null, completedStorylines: [...state.completedStorylines, state.activeStoryline?.id].filter(Boolean) };
     case 'LOAD_STATE':
       return { ...initialState, ...action.data, screen: 'game', messages: [], eventQueue: [] };
     default:
@@ -247,6 +256,25 @@ export function GameProvider({ children }) {
     } catch(e) { return false; }
   }, []);
 
+  const checkForStorylines = useCallback(() => {
+    if (state.activeStoryline) return null; // already in a storyline
+    for (const sl of storylines) {
+      if (state.completedStorylines.includes(sl.id)) continue;
+      const t = sl.trigger;
+      if (t.location !== 'any' && t.location !== state.location) continue;
+      if (t.minDay && state.day < t.minDay) continue;
+      if (t.minAffection) {
+        let ok = true;
+        for (const [k, v] of Object.entries(t.minAffection)) {
+          if ((state.affections[k] || 0) < v) { ok = false; break; }
+        }
+        if (!ok) continue;
+      }
+      if (Math.random() < (t.chance || 0.3)) return sl;
+    }
+    return null;
+  }, [state.activeStoryline, state.completedStorylines, state.location, state.day, state.affections]);
+
   const autoSave = useCallback(() => {
     const data = { ...state, messages: [], eventQueue: [] };
     localStorage.setItem('fushengyin_autosave', JSON.stringify(data));
@@ -255,7 +283,7 @@ export function GameProvider({ children }) {
   const value = {
     state, dispatch, sfx,
     addMsg, skillCheck, applyEffects, advanceTime,
-    triggerRandomEvent, checkEndings,
+    triggerRandomEvent, checkEndings, checkForStorylines,
     saveGame, loadGame, autoSave,
     playTone, initAudio,
   };
