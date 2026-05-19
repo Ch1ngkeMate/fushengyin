@@ -4,12 +4,18 @@ import { useGame, events, LOCATIONS, TIME_PERIODS, ITEM_DB, NPC_DB } from '../st
 import { ATTR_NAMES, ATTR_ICONS } from '../data/constants.js';
 
 const SCENE_BG = {
-  home: 'linear-gradient(135deg, #2d1f0e 0%, #3d2b1a 40%, #4a3528 100%)',
-  academy: 'linear-gradient(135deg, #1a2a1a 0%, #2d3d2d 40%, #1a3a2a 100%)',
-  market: 'linear-gradient(135deg, #2d1a0e 0%, #4d2d1a 40%, #3d2010 100%)',
-  office: 'linear-gradient(135deg, #1a1a2d 0%, #2d2d4d 40%, #1a1a3d 100%)',
-  mystic: 'linear-gradient(135deg, #1a0e2d 0%, #3d1a4d 40%, #2d0e3d 100%)',
+  home:    'radial-gradient(ellipse at 30% 70%, #5a3a1a 0%, #3d2b1a 30%, #2a1a0e 60%, #1a1008 100%)',
+  academy: 'radial-gradient(ellipse at 70% 30%, #3a5a3a 0%, #2d3d2d 30%, #1a2a1a 60%, #0e1a0e 100%)',
+  market:  'radial-gradient(ellipse at 50% 50%, #5a4a2a 0%, #4d2d1a 30%, #3d2010 60%, #1a0e08 100%)',
+  office:  'radial-gradient(ellipse at 60% 40%, #3a3a5a 0%, #2d2d4d 30%, #1a1a3d 60%, #0e0e1a 100%)',
+  mystic:  'radial-gradient(ellipse at 50% 50%, #5a2a5a 0%, #3d1a4d 30%, #2d0e3d 60%, #1a0a2a 100%)',
 };
+
+const SCENE_OVERLAY = {
+  home:    '🏯', academy: '📖', market: '🏪', office: '⚖️', mystic: '🌀'
+};
+
+const MAX_ACTIONS_PER_DAY = 8;
 
 export default function GameScreen() {
   const {
@@ -133,6 +139,13 @@ export default function GameScreen() {
   const doAction = useCallback((locAction) => {
     click();
     initAudio();
+
+    // Daily action limit
+    if (state.actionsToday >= MAX_ACTIONS_PER_DAY) {
+      pushMsg('今日已劳累过度，请休息或等待明日再行动。', 'failure');
+      return;
+    }
+
     dispatch({ type: 'INCREMENT_VISIT', loc: state.location });
 
     if (locAction === 'shop') { setShowShop(true); return; }
@@ -206,6 +219,7 @@ export default function GameScreen() {
 
   const moveTo = useCallback((locId) => {
     if (state.location === locId) return;
+    if (state.actionsToday >= MAX_ACTIONS_PER_DAY) { pushMsg('今日已劳累过度，无法移动。', 'failure'); return; }
     click();
     dispatch({ type: 'SET_LOCATION', loc: locId });
     pushMsg(`来到了【${LOCATIONS[locId].name}】。${LOCATIONS[locId].desc}`, 'system');
@@ -215,7 +229,7 @@ export default function GameScreen() {
       const e = triggerRandomEvent(locId);
       if (e) triggerEvent(e);
     }
-  }, [state.location, click, dispatch, pushMsg, advanceTime, triggerRandomEvent, triggerEvent]);
+  }, [state.location, state.actionsToday, click, dispatch, pushMsg, advanceTime, triggerRandomEvent, triggerEvent]);
 
   const visibleLocs = Object.entries(LOCATIONS).filter(([, loc]) => {
     if (loc.unlock) {
@@ -240,8 +254,12 @@ export default function GameScreen() {
     <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {/* Scene Image */}
       <div className="scene-img-container" style={{ background: SCENE_BG[state.location] || SCENE_BG.home }}>
-        <span>{LOCATIONS[state.location]?.icon}</span>
-        <div className="scene-label">{LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {TIME_PERIODS[state.period]}</div>
+        <div style={{ fontSize: 64, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))', opacity: 0.7 }}>
+          {SCENE_OVERLAY[state.location] || LOCATIONS[state.location]?.icon}
+        </div>
+        <div className="scene-label">
+          {LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {TIME_PERIODS[state.period]} · {state.actionsToday}/{MAX_ACTIONS_PER_DAY}行动
+        </div>
       </div>
 
       {/* Message Area */}

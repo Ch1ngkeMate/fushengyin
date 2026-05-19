@@ -82,19 +82,20 @@ function reducer(state, action) {
       };
     case 'ADVANCE_TIME':
       return (() => {
-        let { day, period, actionsToday, energy, tempBuffs } = state;
-        actionsToday += action.steps || 1;
-        if (actionsToday >= 4) {
-          actionsToday = 0;
-          period++;
-          if (period >= 5) {
-            period = 0;
-            day++;
-            energy = Math.min(state.maxEnergy, energy + 15);
-            tempBuffs = {};
-          }
+        const steps = action.steps || 1;
+        let newPeriod = state.period + steps;
+        let newDay = state.day;
+        let newActions = state.actionsToday + steps;
+        let newEnergy = state.energy;
+        let newBuffs = state.tempBuffs;
+        if (newPeriod >= 5) {
+          newDay += Math.floor(newPeriod / 5);
+          newPeriod %= 5;
+          newActions = 0;
+          newEnergy = Math.min(state.maxEnergy, state.energy + 15);
+          newBuffs = {};
         }
-        return { ...state, day, period, actionsToday, energy, tempBuffs };
+        return { ...state, day: newDay, period: newPeriod, actionsToday: newActions, energy: newEnergy, tempBuffs: newBuffs };
       })();
     case 'INCREMENT_VISIT':
       return {
