@@ -3,6 +3,7 @@ import { Button, Modal, Divider } from 'animal-island-ui';
 import { useGame, events, LOCATIONS, TIME_PERIODS, ITEM_DB, NPC_DB } from '../state/GameContext.jsx';
 import storylines from '../data/storylines.js';
 import { getBestPrompt, getScenePrompt, SPECIAL_PROMPTS } from '../data/imagePrompts.js';
+import { generateImage, preloadScenes } from '../utils/imageGen.js';
 import { ATTR_NAMES, ATTR_ICONS } from '../data/constants.js';
 
 const SCENE_BG = {
@@ -32,8 +33,9 @@ export default function GameScreen() {
   } = useGame();
 
   const msgEnd = useRef(null);
-  const isNight = state.period === 4; // 夜晚
-  const canAct = !isNight || (state.activeStoryline); // 夜晚只能做剧情或休息
+  const isNight = state.period === 4;
+  const nightBlocked = isNight && !state.activeStoryline; // 夜晚且无特殊剧情 → 锁定
+  const actionBlocked = state.actionsToday >= MAX_ACTIONS_PER_DAY || !!pendingEvent || nightBlocked;
   const timeLabel = TIME_PERIODS[state.period];
   const periodKey = state.period;
 
@@ -46,6 +48,8 @@ export default function GameScreen() {
   const [showAttr, setShowAttr] = useState(false);
   const [pendingEvent, setPendingEvent] = useState(null);
   const [renderedMsgs, setRenderedMsgs] = useState([]);
+  const [sceneImgUrl, setSceneImgUrl] = useState('');
+  const [sceneImgLoading, setSceneImgLoading] = useState(false);
 
   const click = useCallback(() => { if (sfx.sfxEnabled) playTone(800, 0.06, 'square', 0.04); }, [sfx, playTone]);
   const successSfx = useCallback(() => { if (sfx.sfxEnabled) { playTone(523,0.1); setTimeout(()=>playTone(659,0.1),100); setTimeout(()=>playTone(784,0.15),200); } }, [sfx, playTone]);
@@ -80,6 +84,20 @@ export default function GameScreen() {
       if (ending) dispatch({ type: 'SET_SCREEN', screen: 'ending', ending });
     }
   }, [state.day, checkEndings, dispatch]);
+
+  // Generate scene image on location / period / storyline change
+  useEffect(() => {
+    const prompt = getBestPrompt(state, undefined, undefined);
+    setSceneImgLoading(true);
+    setSceneImgUrl('');
+    generateImage(prompt).then(url => {
+      if (url) setSceneImgUrl(url);
+      setSceneImgLoading(false);
+    }).catch(() => setSceneImgLoading(false));
+  }, [state.location, state.period, state.activeStoryline?.id, state.activeStoryline?.step]);
+
+  // Preload common scenes on mount
+  useEffect(() => { preloadScenes(); }, []);
 
   // Check transmute trigger
   useEffect(() => {
@@ -338,19 +356,25 @@ export default function GameScreen() {
     <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {/* Scene Image */}
       <div className="scene-img-container" style={{ background: SCENE_BG[state.location] || SCENE_BG.home }}>
-        <div style={{ zIndex: 0, fontSize: 72, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))', opacity: 0.65 }}>
+        {sceneImgUrl && <img src={sceneImgUrl} alt="" style={{ position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',zIndex:1 }} />}
+        {sceneImgLoading && <div style={{ position:'absolute',inset:0,zIndex:2,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'rgba(255,255,255,0.5)' }}>🎨 生成场景图...</div>}
+        <div style={{ zIndex: 0, fontSize: 72, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))', opacity: sceneImgUrl ? 0 : 0.65 }}>
           {SCENE_OVERLAY[state.location] || LOCATIONS[state.location]?.icon}
         </div>
-        <div className="scene-label">
+        <div className="scene-label" style={{ zIndex: 3 }}>
           {LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {TIME_PERIODS[state.period]} · {state.actionsToday}/{MAX_ACTIONS_PER_DAY}动
           {isNight && !state.activeStoryline ? ' 🌙休息' : ''}
-        </div>
-        <div style={{ position:'absolute', bottom: 26, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 11, letterSpacing: 1, padding: '0 40px' }}>
-          {getScenePrompt(state.location, TIME_PERIODS[state.period]).substring(0, 80)}...
         </div>
       </div>
 
       {/* Message Area */}
+      {/* Night warning */}
+      {nightBlocked && (
+        <div style={{ background:'rgba(123,94,167,0.3)', color:'#b8a0d8', textAlign:'center', padding:'6px', fontSize:12, borderBottom:'1px solid rgba(123,94,167,0.3)' }}>
+          🌙 夜深了 — 只能休息或处理特殊剧情。点击「😴休息💤」入睡。
+        </div>
+      )}
+
       <div className="msg-area" ref={msgAreaRef} onClick={initAudio}>
         {renderedMsgs.map(m => (
           <div key={m.id}>
@@ -396,11 +420,15 @@ export default function GameScreen() {
               shop:'🛒商店', tea_house:'🍵茶馆', gamble:'🎲赌坊', street_wander:'🚶闲逛',
               handle_cases:'⚖️审案', court_meeting:'👑上朝', bribe:'🎁打点', review:'📜卷宗',
               meditate:'🧘冥想', magic_training:'🔮训练', dungeon:'⚔️地下城', summon:'✨召唤' };
-            return <Button key={a} size="small" disabled={!!pendingEvent} onClick={()=>doAction(a)}>{labels[a]||a}</Button>;
+            const isRest = a === 'rest';
+            const blocked = isRest ? false : actionBlocked;
+            return <Button key={a} size="small" disabled={blocked} onClick={()=>doAction(a)}>
+              {labels[a]||a}{isRest && nightBlocked ? '💤' : ''}
+            </Button>;
           })}
-          <Button size="small" type="primary" disabled={!!pendingEvent} onClick={()=>{click();setShowInv(true);}}>🎒背包</Button>
-          <Button size="small" type="dashed" disabled={!!pendingEvent} onClick={()=>{click();setShowNPC(true);}}>💕人际</Button>
-          <Button size="small" disabled={!!pendingEvent} onClick={()=>{click();setShowAttr(true);}}>📊属性</Button>
+          <Button size="small" type="primary" disabled={actionBlocked} onClick={()=>{click();setShowInv(true);}}>🎒背包</Button>
+          <Button size="small" type="dashed" disabled={actionBlocked} onClick={()=>{click();setShowNPC(true);}}>💕人际</Button>
+          <Button size="small" disabled={actionBlocked} onClick={()=>{click();setShowAttr(true);}}>📊属性</Button>
           <Button size="small" onClick={()=>{click();setShowSave(true);}}>💾存档</Button>
           <Button size="small" onClick={()=>{click();setShowSettings(true);}}>⚙️</Button>
         </div>
@@ -408,7 +436,7 @@ export default function GameScreen() {
         <div className="loc-row">
           {visibleLocs.map(([id, loc]) => (
             <button key={id} className={`loc-tab${state.location===id?' active':''}`}
-              disabled={!!pendingEvent}
+              disabled={nightBlocked || !!pendingEvent}
               onClick={()=>moveTo(id)}>
               {loc.icon} {loc.name}
             </button>
