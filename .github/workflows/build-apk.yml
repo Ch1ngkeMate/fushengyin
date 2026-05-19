@@ -34,43 +34,17 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platforms;android-34 build-tools;34.0.0'
+          java-version: '17'
 
       - name: Install Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+        run: npm install @capacitor/core@5 @capacitor/cli@5 @capacitor/android@5
 
       - name: Add Android platform
         run: npx cap add android
-
-      - name: Patch duplicate class issue
-        run: |
-          # Fix gradle.properties
-          echo "android.defaults.buildfeatures.buildconfig=true" >> android/gradle.properties
-          echo "android.nonTransitiveRClass=true" >> android/gradle.properties
-          # Fix build.gradle
-          cat >> android/app/build.gradle << 'PATCH'
-
-          configurations.all {
-              resolutionStrategy {
-                  preferProjectModules()
-              }
-          }
-          android {
-              packagingOptions {
-                  pickFirsts += ['**/*.so']
-                  excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
-              }
-          }
-          PATCH
 
       - name: Sync web assets
         run: npx cap sync android
