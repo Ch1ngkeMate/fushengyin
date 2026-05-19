@@ -85,19 +85,25 @@ export default function GameScreen() {
     }
   }, [state.day, checkEndings, dispatch]);
 
-  // Generate scene image on location / period / storyline change
+  // Generate scene image
   useEffect(() => {
     const prompt = getBestPrompt(state, undefined, undefined);
     setSceneImgLoading(true);
-    setSceneImgUrl('');
+    // Fallback: hide loading spinner after 1.5s regardless
+    const fallback = setTimeout(() => setSceneImgLoading(false), 1500);
     generateImage(prompt).then(url => {
+      clearTimeout(fallback);
       if (url) setSceneImgUrl(url);
       setSceneImgLoading(false);
-    }).catch(() => setSceneImgLoading(false));
+    }).catch(() => {
+      clearTimeout(fallback);
+      setSceneImgLoading(false);
+    });
+    return () => clearTimeout(fallback);
   }, [state.location, state.period, state.activeStoryline?.id, state.activeStoryline?.step]);
 
-  // Preload common scenes on mount
-  useEffect(() => { preloadScenes(); }, []);
+  // Skip preload in dev to avoid blocking
+  useEffect(() => { setTimeout(() => preloadScenes(), 3000); }, []);
 
   // Check transmute trigger
   useEffect(() => {

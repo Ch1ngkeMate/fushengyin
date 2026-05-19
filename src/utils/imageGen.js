@@ -2,10 +2,7 @@
 // 直接调用百度千帆 API，绕过 CORS 通过 Vite proxy
 
 const API_KEY = 'bce-v3/ALTAK-SBPi3yOwIBmJWe1SDwiO4/e735f6c8cf68128a646c2adc8ea5216dfbe1de1a';
-// 开发模式走 Vite proxy，生产模式直连（ERNIE API 支持跨域）
-const API_URL = import.meta.env.DEV
-  ? '/api/ernie-image'
-  : 'https://qianfan.baidubce.com/v2/ernie-image/images/generations';
+const API_URL = 'https://qianfan.baidubce.com/v2/ernie-image/images/generations';
 
 // 内存缓存
 const cache = new Map();
@@ -48,7 +45,7 @@ export async function generateImage(prompt) {
       });
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
+      const timeout = setTimeout(() => controller.abort(), 5000);
 
       const res = await fetch(API_URL, {
         method: 'POST',
