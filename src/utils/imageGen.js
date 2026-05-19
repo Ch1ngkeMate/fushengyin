@@ -47,6 +47,9 @@ export async function generateImage(prompt) {
         n: 1
       });
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
       const res = await fetch(API_URL, {
         method: 'POST',
         mode: 'cors',
@@ -54,8 +57,9 @@ export async function generateImage(prompt) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${API_KEY}`
         },
-        body
-      });
+        body,
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeout));
 
       if (!res.ok) throw new Error(`API ${res.status}`);
 
@@ -69,8 +73,9 @@ export async function generateImage(prompt) {
       }
       throw new Error('No image URL in response');
     } catch (e) {
-      console.warn('Image gen failed:', e.message);
-      return null; // 返回 null，UI 显示 fallback
+      if (e.name === 'AbortError') console.warn('Image gen timeout');
+      else console.warn('Image gen failed:', e.message);
+      return null; // fallback to CSS gradient
     } finally {
       pendingRequests.delete(key);
     }
