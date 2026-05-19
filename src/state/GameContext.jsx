@@ -217,7 +217,10 @@ export function GameProvider({ children }) {
       if (c.luck && a.luck < c.luck) met = false;
       if (c.magic && (a.magic || 0) < c.magic) met = false;
       if (c.day && state.day < c.day) met = false;
-      if (c.gold && state.gold < c.gold) met = false;
+      if (c.gold !== undefined) {
+        if (c.gold >= 0 && state.gold < c.gold) met = false; // need gold >= c.gold
+        if (c.gold < 0 && state.gold >= c.gold) met = false;  // need gold < c.gold (negative threshold)
+      }
       if (c.transmuted && !state.transmuted) met = false;
       if (c.affection_qingmei && af.qingmei < c.affection_qingmei) met = false;
       if (c.affection_rival && af.rival < c.affection_rival) met = false;

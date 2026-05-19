@@ -186,17 +186,19 @@ export default function GameScreen() {
 
     // Only advance time if no pending event was created
     if (!pendingEvent) {
+      const oldDay = state.day;
       advanceTime(1);
+      // Only check endings on day transitions
+      if (state.day !== oldDay) {
+        const ending = checkEndings();
+        if (ending) { dispatch({ type: 'SET_SCREEN', screen: 'ending', ending }); return; }
+      }
       // Random event after action
       if (Math.random() < 0.3) {
         const e = triggerRandomEvent(state.location);
         if (e) triggerEvent(e);
       }
     }
-
-    // Check endings
-    const ending = checkEndings();
-    if (ending) dispatch({ type: 'SET_SCREEN', screen: 'ending', ending });
   }, [state, click, initAudio, pendingEvent, skillCheck, applyEffects, advanceTime, triggerRandomEvent, dispatch, checkEndings, pushMsg, triggerEvent]);
 
   const moveTo = useCallback((locId) => {
