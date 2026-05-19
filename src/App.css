@@ -1,3 +1,6 @@
+/* Fix height chain broken by Cursor wrapper */
+.animal-cursor, #root > div, #root { height: 100%; }
+
 .app-root {
   height: 100%; width: 100%; margin: 0 auto;
   display: flex; flex-direction: column; overflow: hidden;
