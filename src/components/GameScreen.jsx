@@ -53,6 +53,16 @@ export default function GameScreen() {
     }
   }, [state.name]);
 
+  // Check endings on day transition
+  const prevDay = useRef(state.day);
+  useEffect(() => {
+    if (state.day > prevDay.current && state.day > 1) {
+      prevDay.current = state.day;
+      const ending = checkEndings();
+      if (ending) dispatch({ type: 'SET_SCREEN', screen: 'ending', ending });
+    }
+  }, [state.day, checkEndings, dispatch]);
+
   // Check transmute trigger
   useEffect(() => {
     if (state.transmuteProgress >= 8 && !state.transmuted) {
@@ -184,15 +194,8 @@ export default function GameScreen() {
       actionMessages[locAction]();
     }
 
-    // Only advance time if no pending event was created
     if (!pendingEvent) {
-      const oldDay = state.day;
       advanceTime(1);
-      // Only check endings on day transitions
-      if (state.day !== oldDay) {
-        const ending = checkEndings();
-        if (ending) { dispatch({ type: 'SET_SCREEN', screen: 'ending', ending }); return; }
-      }
       // Random event after action
       if (Math.random() < 0.3) {
         const e = triggerRandomEvent(state.location);
