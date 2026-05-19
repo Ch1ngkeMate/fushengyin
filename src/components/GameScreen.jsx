@@ -14,6 +14,11 @@ const SCENE_BG = {
 const SCENE_OVERLAY = {
   home:    '🏯', academy: '📖', market: '🏪', office: '⚖️', mystic: '🌀'
 };
+const SCENE_DESC = {
+  home:    '朱门大院 · 雕梁画栋', academy: '书声琅琅 · 墨香四溢',
+  market:  '车水马龙 · 店铺林立', office: '明镜高悬 · 庄严肃穆',
+  mystic:  '灵气氤氲 · 异界之门'
+};
 
 const MAX_ACTIONS_PER_DAY = 8;
 
@@ -254,11 +259,14 @@ export default function GameScreen() {
     <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {/* Scene Image */}
       <div className="scene-img-container" style={{ background: SCENE_BG[state.location] || SCENE_BG.home }}>
-        <div style={{ fontSize: 64, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))', opacity: 0.7 }}>
+        <div style={{ zIndex: 0, fontSize: 72, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))', opacity: 0.65 }}>
           {SCENE_OVERLAY[state.location] || LOCATIONS[state.location]?.icon}
         </div>
         <div className="scene-label">
-          {LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {TIME_PERIODS[state.period]} · {state.actionsToday}/{MAX_ACTIONS_PER_DAY}行动
+          {LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {TIME_PERIODS[state.period]} · {state.actionsToday}/{MAX_ACTIONS_PER_DAY}动
+        </div>
+        <div style={{ position:'absolute', bottom: 30, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13, letterSpacing: 2 }}>
+          {SCENE_DESC[state.location]}
         </div>
       </div>
 
