@@ -1,0 +1,9 @@
+{
+  "name": "fushengyin",
+  "version": "1.0.0",
+  "description": "浮生引 · 红尘与异界 — 高自由度文字叙事养成游戏",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Static HTML — no build step'"
+  }
+}
