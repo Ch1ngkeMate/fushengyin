@@ -11,6 +11,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare web directory
+        run: |
+          mkdir -p www
+          cp index.html www/
+          cp manifest.json www/
+          cp sw.js www/
+          ls -la www/
+
+      - name: Create capacitor config
+        run: |
+          cat > capacitor.config.json << 'CONF'
+          {
+            "appId": "com.fushengyin.game",
+            "appName": "浮生引",
+            "webDir": "www",
+            "bundledWebRuntime": false
+          }
+          CONF
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -28,13 +47,12 @@ jobs:
           packages: 'platforms;android-34 build-tools;34.0.0'
 
       - name: Install Capacitor
-        run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Add Android platform
         run: npx cap add android
 
-      - name: Copy web assets
+      - name: Sync web assets
         run: npx cap sync android
 
       - name: Build APK
