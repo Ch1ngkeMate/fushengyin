@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Modal, Divider } from 'animal-island-ui';
 import { useGame, events, LOCATIONS, TIME_PERIODS, ITEM_DB, NPC_DB } from '../state/GameContext.jsx';
 import storylines from '../data/storylines.js';
-import { getBestPrompt, getScenePrompt, SPECIAL_PROMPTS } from '../data/imagePrompts.js';
-import { generateImage, preloadScenes } from '../utils/imageGen.js';
+import { getScenePrompt } from '../data/imagePrompts.js';
 import { ATTR_NAMES, ATTR_ICONS } from '../data/constants.js';
 import nightEvents from '../data/nightEvents.js';
+// import { generateImage, preloadScenes } from '../utils/imageGen.js'; // 临时屏蔽生图 API
 
 const SCENE_BG = {
   home:    'radial-gradient(ellipse at 30% 70%, #5a3a1a 0%, #3d2b1a 30%, #2a1a0e 60%, #1a1008 100%)',
@@ -53,8 +53,8 @@ export default function GameScreen() {
   const [showAttr, setShowAttr] = useState(false);
   const [pendingEvent, setPendingEvent] = useState(null);
   const [renderedMsgs, setRenderedMsgs] = useState([]);
-  const [sceneImgUrl, setSceneImgUrl] = useState('');
-  const [sceneImgLoading, setSceneImgLoading] = useState(false);
+  // const [sceneImgUrl, setSceneImgUrl] = useState('');
+  // const [sceneImgLoading, setSceneImgLoading] = useState(false);
 
   const click = useCallback(() => { if (sfx.sfxEnabled) playTone(800, 0.06, 'square', 0.04); }, [sfx, playTone]);
   const successSfx = useCallback(() => { if (sfx.sfxEnabled) { playTone(523,0.1); setTimeout(()=>playTone(659,0.1),100); setTimeout(()=>playTone(784,0.15),200); } }, [sfx, playTone]);
@@ -91,25 +91,8 @@ export default function GameScreen() {
     }
   }, [state.day, checkEndings, dispatch]);
 
-  // Generate scene image
-  useEffect(() => {
-    const prompt = getBestPrompt(state, undefined, undefined);
-    setSceneImgLoading(true);
-    // Fallback: hide loading spinner after 1.5s regardless
-    const fallback = setTimeout(() => setSceneImgLoading(false), 1500);
-    generateImage(prompt).then(url => {
-      clearTimeout(fallback);
-      if (url) setSceneImgUrl(url);
-      setSceneImgLoading(false);
-    }).catch(() => {
-      clearTimeout(fallback);
-      setSceneImgLoading(false);
-    });
-    return () => clearTimeout(fallback);
-  }, [state.location, state.period, state.activeStoryline?.id, state.activeStoryline?.step]);
-
-  // Skip preload in dev to avoid blocking
-  useEffect(() => { setTimeout(() => preloadScenes(), 3000); }, []);
+  // Image gen disabled for stability
+  // useEffect(() => { ... }, [...]);
 
   // Check transmute trigger
   useEffect(() => {
@@ -424,14 +407,15 @@ export default function GameScreen() {
     <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {/* Scene Image */}
       <div className="scene-img-container" style={{ background: SCENE_BG[state.location] || SCENE_BG.home }}>
-        {sceneImgUrl && <img src={sceneImgUrl} alt="" style={{ position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',zIndex:1 }} />}
-        {sceneImgLoading && <div style={{ position:'absolute',inset:0,zIndex:2,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'rgba(255,255,255,0.5)' }}>🎨 生成场景图...</div>}
-        <div style={{ zIndex: 0, fontSize: 72, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))', opacity: sceneImgUrl ? 0 : 0.65 }}>
+        <div style={{ fontSize: 72, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.6))', opacity: 0.65 }}>
           {SCENE_OVERLAY[state.location] || LOCATIONS[state.location]?.icon}
         </div>
-        <div className="scene-label" style={{ zIndex: 3 }}>
-          {LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {TIME_PERIODS[state.period]} · {state.actionsToday}/{MAX_ACTIONS_PER_DAY}动
+        <div className="scene-label">
+          {LOCATIONS[state.location]?.icon} {LOCATIONS[state.location]?.name} · {periodLabel}{isDaytime?` (剩${actionsLeft}次)`:` 结算`}
           {isNight && !state.activeStoryline ? ' 🌙休息' : ''}
+        </div>
+        <div style={{ position:'absolute', bottom: 26, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 10, letterSpacing: 1, padding: '0 40px' }}>
+          {getScenePrompt(state.location, periodLabel).substring(0, 70)}...
         </div>
       </div>
 
