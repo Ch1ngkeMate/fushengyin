@@ -15,7 +15,7 @@ const initialState = {
   name: '', gender: '女',
   attrs: { physique:1, intelligence:1, charm:1, luck:1, cunning:1, magic:0, sword:0 },
   gold: 20, energy: 100, maxEnergy: 100,
-  day: 1, period: 0, // 0=清晨 1=上午 2=下午 3=傍晚 4=夜晚
+  day: 1, period: 1, // 1=上午 2=下午 3=傍晚 4=夜晚
   midDayActions: 3, // 上午剩余
   afternoonActions: 3, // 下午剩余
   isNightSettlement: false, // 夜晚结算模式

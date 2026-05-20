@@ -41,7 +41,7 @@ export default function CreateScreen() {
     if (name.length < 1 || name.length > 4) return;
     if (remain !== 0) return;
     click();
-    dispatch({ type: 'SET_STATE', payload: { name, gender, attrs, gold: 20, day: 1, period: 0,
+    dispatch({ type: 'SET_STATE', payload: { name, gender, attrs, gold: 20, day: 1, period: 1,
       transmuteProgress: 0, officeUnlocked: false, transmuted: false,
       affections: { qingmei:30, rival:10, mentor:0 }, inventory: [], visitCounts: {},
       flags: {}, actionsToday: 0, lastEventId: null, tempBuffs: {}, messages: [] } });

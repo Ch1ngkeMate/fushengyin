@@ -77,7 +77,6 @@ export default function GameScreen() {
         { text: '选择一个行动开始吧。切换地点探索不同的剧情。', cls: 'system', id: 3 },
       ];
       setRenderedMsgs(msgs);
-      dispatch({ type:'SET_STATE', payload:{ period:1, midDayActions:3, afternoonActions:3, isNightSettlement:false } });
     }
   }, [state.name]);
 
