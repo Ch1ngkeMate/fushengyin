@@ -182,7 +182,14 @@ function reducer(state, action) {
     case 'SET_PLAN':
       return { ...state, planMode: action.plan };
     case 'LOAD_STATE':
-      return { ...initialState, ...action.data, screen: 'game', messages: [], eventQueue: [] };
+      return {
+        ...initialState, ...action.data,
+        screen: 'game', messages: [], eventQueue: [],
+        period: action.data.period === 0 ? 1 : (action.data.period || 1), // normalize
+        midDayActions: action.data.midDayActions || 3,
+        afternoonActions: action.data.afternoonActions || 3,
+        isNightSettlement: false
+      };
     default:
       return state;
   }

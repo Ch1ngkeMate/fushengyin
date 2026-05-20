@@ -53,9 +53,9 @@ export default function GameScreen() {
   const [renderedMsgs, setRenderedMsgs] = useState([]);
 
   // Derived values (after all useState — prevents TDZ from minifier reordering)
-  const periodLabel = state.period === 1 ? '上午' : state.period === 2 ? '下午' : TIME_PERIODS[state.period];
+  const periodLabel = state.period === 0 ? '清晨' : state.period === 1 ? '上午' : state.period === 2 ? '下午' : TIME_PERIODS[state.period] || '白天';
   const actionsLeft = state.period === 1 ? state.midDayActions : state.period === 2 ? state.afternoonActions : 0;
-  const isDaytime = state.period === 1 || state.period === 2;
+  const isDaytime = state.period === 0 || state.period === 1 || state.period === 2; // 0=清晨也属于白天
   const isNight = state.period === 4 || state.isNightSettlement;
   const nightBlocked = isNight && !state.activeStoryline;
   const actionBlocked = state.actionsToday >= MAX_ACTIONS_PER_DAY || !!pendingEvent || nightBlocked || state.isNightSettlement;
