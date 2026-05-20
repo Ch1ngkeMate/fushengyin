@@ -40,15 +40,9 @@ export default function GameScreen() {
   } = useGame();
 
   const msgEnd = useRef(null);
-  // v3 time: 上午3 + 下午3, then night settlement
-  const periodLabel = state.period === 1 ? '上午' : state.period === 2 ? '下午' : TIME_PERIODS[state.period];
-  const actionsLeft = state.period === 1 ? state.midDayActions : state.period === 2 ? state.afternoonActions : 0;
-  const isDaytime = state.period === 1 || state.period === 2;
-  const isNight = state.period === 4 || state.isNightSettlement;
-  const nightBlocked = isNight && !state.activeStoryline;
-  const actionBlocked = state.actionsToday >= MAX_ACTIONS_PER_DAY || !!pendingEvent || nightBlocked || state.isNightSettlement;
-
   const msgAreaRef = useRef(null);
+
+  // ALL useState must be before any derived values that reference them
   const [showShop, setShowShop] = useState(false);
   const [showInv, setShowInv] = useState(false);
   const [showSave, setShowSave] = useState(false);
@@ -57,6 +51,14 @@ export default function GameScreen() {
   const [showAttr, setShowAttr] = useState(false);
   const [pendingEvent, setPendingEvent] = useState(null);
   const [renderedMsgs, setRenderedMsgs] = useState([]);
+
+  // Derived values (after all useState — prevents TDZ from minifier reordering)
+  const periodLabel = state.period === 1 ? '上午' : state.period === 2 ? '下午' : TIME_PERIODS[state.period];
+  const actionsLeft = state.period === 1 ? state.midDayActions : state.period === 2 ? state.afternoonActions : 0;
+  const isDaytime = state.period === 1 || state.period === 2;
+  const isNight = state.period === 4 || state.isNightSettlement;
+  const nightBlocked = isNight && !state.activeStoryline;
+  const actionBlocked = state.actionsToday >= MAX_ACTIONS_PER_DAY || !!pendingEvent || nightBlocked || state.isNightSettlement;
   // const [sceneImgUrl, setSceneImgUrl] = useState('');
   // const [sceneImgLoading, setSceneImgLoading] = useState(false);
 
