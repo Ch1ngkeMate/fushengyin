@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Modal, Divider } from 'animal-island-ui';
-import { useGame, events, LOCATIONS, TIME_PERIODS, ITEM_DB, NPC_DB } from '../state/GameContext.jsx';
+import { useGame } from '../state/GameContext.jsx';
+import events from '../data/events.js';
+import { LOCATIONS, TIME_PERIODS } from '../data/constants.js';
+import { ITEM_DB } from '../data/items.js';
+import { NPC_DB } from '../data/npcs.js';
 import storylines from '../data/storylines.js';
 import { getScenePrompt } from '../data/imagePrompts.js';
 import { ATTR_NAMES, ATTR_ICONS } from '../data/constants.js';
