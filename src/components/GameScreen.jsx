@@ -99,6 +99,13 @@ export default function GameScreen() {
   // Image gen disabled for stability
   // useEffect(() => { ... }, [...]);
 
+  // Auto-trigger night settlement when afternoon actions exhausted
+  useEffect(() => {
+    if (state.period === 3 && !state.isNightSettlement && state.actionsToday >= 6) {
+      enterNight();
+    }
+  }, [state.period, state.isNightSettlement, state.actionsToday]);
+
   // Check transmute trigger
   useEffect(() => {
     if (state.transmuteProgress >= 8 && !state.transmuted) {
@@ -110,11 +117,9 @@ export default function GameScreen() {
   }, [state.transmuteProgress, state.transmuted]);
 
   const pushMsg = useCallback((text, cls = 'story') => {
-    const now = new Date();
-    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    const label = `🕐${ts} ${TIME_PERIODS[state.period]}·第${state.day}天`;
+    const label = `🕐${periodLabel || TIME_PERIODS[state.period]}·第${state.day}天`;
     setRenderedMsgs(prev => [...prev, { text, cls, label, id: Date.now() + Math.random() }]);
-  }, [state.period, state.day]);
+  }, [state.period, state.day, periodLabel]);
 
   // Storyline choice resolution
   const resolveStorylineChoice = useCallback((sl, step, choice) => {

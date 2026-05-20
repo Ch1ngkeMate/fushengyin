@@ -143,7 +143,7 @@ function reducer(state, action) {
       return (() => {
         let s = { ...state };
         s.day++;
-        s.period = 0;
+        s.period = 1; // 从上午开始
         s.midDayActions = 3;
         s.afternoonActions = 3;
         s.actionsToday = 0;
