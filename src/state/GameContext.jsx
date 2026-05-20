@@ -6,7 +6,6 @@ import events from '../data/events.js';
 import { ENDINGS } from '../data/endings.js';
 import storylines from '../data/storylines.js';
 import { MILESTONES } from '../data/milestones.js';
-import nightEvents from '../data/nightEvents.js';
 
 const GameContext = createContext(null);
 
