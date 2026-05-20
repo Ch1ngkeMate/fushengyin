@@ -5,6 +5,7 @@ import TitleScreen from './components/TitleScreen.jsx';
 import CreateScreen from './components/CreateScreen.jsx';
 import GameScreen from './components/GameScreen.jsx';
 import EndingScreen from './components/EndingScreen.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './App.css';
 
 export default function App() {
@@ -30,10 +31,12 @@ export default function App() {
   return (
     <Cursor>
       <div className="app-root">
-        {state.screen === 'title' && <TitleScreen />}
-        {state.screen === 'create' && <CreateScreen />}
-        {state.screen === 'game' && <GameScreen />}
-        {state.screen === 'ending' && <EndingScreen />}
+        <ErrorBoundary>
+          {state.screen === 'title' && <TitleScreen />}
+          {state.screen === 'create' && <CreateScreen />}
+          {state.screen === 'game' && <GameScreen />}
+          {state.screen === 'ending' && <EndingScreen />}
+        </ErrorBoundary>
       </div>
     </Cursor>
   );
