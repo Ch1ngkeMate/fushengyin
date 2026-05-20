@@ -5,29 +5,46 @@ import { LOCATIONS, TIME_PERIODS } from '../data/constants.js';
 import events from '../data/events.js';
 import { ENDINGS } from '../data/endings.js';
 import storylines from '../data/storylines.js';
+import { MILESTONES } from '../data/milestones.js';
+import nightEvents from '../data/nightEvents.js';
 
 const GameContext = createContext(null);
 
 const initialState = {
-  screen: 'title', // title | create | game | ending
+  screen: 'title',
   name: '', gender: '女',
   attrs: { physique:1, intelligence:1, charm:1, luck:1, cunning:1, magic:0, sword:0 },
   gold: 20, energy: 100, maxEnergy: 100,
-  day: 1, period: 0,
+  day: 1, period: 0, // 0=清晨 1=上午 2=下午 3=傍晚 4=夜晚
+  midDayActions: 3, // 上午剩余
+  afternoonActions: 3, // 下午剩余
+  isNightSettlement: false, // 夜晚结算模式
+  nightEventResult: null,
   location: 'home',
   transmuteProgress: 0, officeUnlocked: false, transmuted: false,
-  affections: { qingmei:30, rival:10, mentor:0 },
+  affections: { qingmei:30, rival:10, mentor:0, elder:15 },
   inventory: [],
   visitCounts: {},
+  actionCounts: {}, // 统计行动类型次数(用于称号)
   lastEventId: null,
-  flags: {},
+  flags: { _milestones: [], _titles: [] },
   actionsToday: 0,
   tempBuffs: {},
   messages: [],
-  eventQueue: [],
   ending: null,
-  activeStoryline: null,  // { id, step, data }
+  activeStoryline: null,
   completedStorylines: [],
+  // v3 新系统
+  mainProgress: 0, // 主线进度 0-100
+  milestones: [], // 已达成的里程碑 ID 列表
+  titles: [], // 已获得的称号
+  shopDiscount: 0, // 商店折扣%
+  familyBonus: 0, // 家族月俸
+  bonusAttr: false, // 额外属性点
+  dualTalent: false, // 文武双全
+  prevAttrs: {}, // 上次结算时的属性(用于日报)
+  prevGold: 20,
+  planMode: null,
 };
 
 function reducer(state, action) {
@@ -84,22 +101,7 @@ function reducer(state, action) {
         }
       };
     case 'ADVANCE_TIME':
-      return (() => {
-        const steps = action.steps || 1;
-        let newPeriod = state.period + steps;
-        let newDay = state.day;
-        let newActions = state.actionsToday + steps;
-        let newEnergy = state.energy;
-        let newBuffs = state.tempBuffs;
-        if (newPeriod >= 5) {
-          newDay += Math.floor(newPeriod / 5);
-          newPeriod %= 5;
-          newActions = 0;
-          newEnergy = Math.min(state.maxEnergy, state.energy + 15);
-          newBuffs = {};
-        }
-        return { ...state, day: newDay, period: newPeriod, actionsToday: newActions, energy: newEnergy, tempBuffs: newBuffs };
-      })();
+      return state; // v3: no-op, time managed by USE_ACTION/ENTER_NIGHT/ADVANCE_DAY
     case 'INCREMENT_VISIT':
       return {
         ...state,
@@ -123,6 +125,63 @@ function reducer(state, action) {
       return { ...state, activeStoryline: { ...state.activeStoryline, step: state.activeStoryline.step + 1 } };
     case 'END_STORYLINE':
       return { ...state, activeStoryline: null, completedStorylines: [...state.completedStorylines, state.activeStoryline?.id].filter(Boolean) };
+    case 'USE_ACTION':
+      return (() => {
+        let s = { ...state };
+        if (s.period === 1) s.midDayActions = Math.max(0, s.midDayActions - 1);
+        else if (s.period === 2) s.afternoonActions = Math.max(0, s.afternoonActions - 1);
+        s.actionsToday++;
+        // Auto-advance to next period when actions exhausted
+        if (s.midDayActions <= 0 && s.period === 1) s.period = 2;
+        if (s.afternoonActions <= 0 && s.period === 2) s.period = 3;
+        return s;
+      })();
+    case 'ENTER_NIGHT':
+      return { ...state, period: 4, isNightSettlement: true, prevAttrs: { ...state.attrs }, prevGold: state.gold };
+    case 'NIGHT_RESULT':
+      return { ...state, nightEventResult: action.result };
+    case 'ADVANCE_DAY':
+      return (() => {
+        let s = { ...state };
+        s.day++;
+        s.period = 0;
+        s.midDayActions = 3;
+        s.afternoonActions = 3;
+        s.actionsToday = 0;
+        s.isNightSettlement = false;
+        s.nightEventResult = null;
+        s.energy = Math.min(s.maxEnergy, s.energy + 20);
+        s.prevAttrs = { ...s.attrs };
+        s.prevGold = s.gold;
+        // Auto +2 mainProgress every 5 days
+        if (s.day % 5 === 0) s.mainProgress = Math.min(100, s.mainProgress + 2);
+        return s;
+      })();
+    case 'ADD_MAIN_PROGRESS':
+      return { ...state, mainProgress: Math.min(100, state.mainProgress + (action.amount || 0)) };
+    case 'CHECK_MILESTONE':
+      return (() => {
+        let s = { ...state };
+        for (const m of MILESTONES) {
+          if (!s.milestones.includes(m.id) && m.cond({...s, attrs:s.attrs, affections:s.affections, visitCounts:s.visitCounts, inventory:s.inventory, flags:s.flags})) {
+            s.milestones = [...s.milestones, m.id];
+            s.flags._milestones = s.milestones;
+            const eff = m.effect({...s});
+            if (eff && typeof eff === 'object') {
+              if (eff.shopDiscount) s.shopDiscount = eff.shopDiscount;
+              if (eff.familyBonus) s.familyBonus = eff.familyBonus;
+              if (eff.bonusAttr) s.bonusAttr = eff.bonusAttr;
+              if (eff.dualTalent) s.dualTalent = eff.dualTalent;
+              if (eff.officeUnlocked) s.officeUnlocked = eff.officeUnlocked;
+              if (eff.attrs) s.attrs = eff.attrs;
+              if (eff.flags) s.flags = { ...s.flags, ...eff.flags };
+            }
+          }
+        }
+        return s;
+      })();
+    case 'SET_PLAN':
+      return { ...state, planMode: action.plan };
     case 'LOAD_STATE':
       return { ...initialState, ...action.data, screen: 'game', messages: [], eventQueue: [] };
     default:

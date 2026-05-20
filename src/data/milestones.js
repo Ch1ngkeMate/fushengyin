@@ -1,0 +1,17 @@
+export const MILESTONES = [
+  { id:'first_step', name:'初露锋芒', cond:s=>(s.attrs.physique>=5||s.attrs.intelligence>=5||s.attrs.charm>=5||s.attrs.cunning>=5),
+    reward:'属性点+1（下一属性提升时额外+1）', effect:s=>({...s, bonusAttr:true}), desc:'任何属性达到5点' },
+  { id:'small_fame', name:'小有名气', cond:s=>s.gold>=200, reward:'永久商店折扣5%', effect:s=>({...s, shopDiscount:5}), desc:'银两≥200' },
+  { id:'noble_friend', name:'贵人相助', cond:s=>Object.values(s.affections).some(v=>v>=50),
+    reward:'获得专属道具·如意佩', effect:s=>{s.inventory.push({id:'misc_relic',name:'如意佩',type:'misc',desc:'贵人赠礼，主线进度+5',qty:1});return s;}, desc:'任意NPC好感≥50' },
+  { id:'scholar_entry', name:'科举童生', cond:s=>s.attrs.intelligence>=6&&s.flags.passedExam,
+    reward:'解锁官府地图，声望+50', effect:s=>({...s, officeUnlocked:true}), desc:'智力≥6且通过童试' },
+  { id:'family_win', name:'宅斗制胜', cond:s=>s.attrs.cunning>=6&&(s.visitCounts.home||0)>=15,
+    reward:'家族月俸+30', effect:s=>({...s,familyBonus:30}), desc:'心计≥6且家族事件≥15次' },
+  { id:'dual_talent', name:'文武双全', cond:s=>s.attrs.intelligence>=7&&s.attrs.physique>=5,
+    reward:'解锁智勇双全被动', effect:s=>({...s,dualTalent:true}), desc:'智力≥7且力量≥5' },
+  { id:'transmute_gate', name:'穿越之门', cond:s=>s.transmuted,
+    reward:'解锁魔法世界+全属性+1', effect:s=>{const a=s.attrs;for(const k in a)a[k]=Math.min(10,a[k]+1);return{...s,attrs:{...a}};}, desc:'成功触发穿越线' },
+  { id:'perfect_life', name:'圆满人生', cond:s=>s.flags._milestones&&s.flags._milestones.length>=3,
+    reward:'终极称号「浮生引者」', effect:s=>{s.flags.ultimateTitle=true;return s;}, desc:'同时达成3个里程碑' },
+];

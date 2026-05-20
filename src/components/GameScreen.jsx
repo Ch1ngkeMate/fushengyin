@@ -5,6 +5,7 @@ import storylines from '../data/storylines.js';
 import { getBestPrompt, getScenePrompt, SPECIAL_PROMPTS } from '../data/imagePrompts.js';
 import { generateImage, preloadScenes } from '../utils/imageGen.js';
 import { ATTR_NAMES, ATTR_ICONS } from '../data/constants.js';
+import nightEvents from '../data/nightEvents.js';
 
 const SCENE_BG = {
   home:    'radial-gradient(ellipse at 30% 70%, #5a3a1a 0%, #3d2b1a 30%, #2a1a0e 60%, #1a1008 100%)',
@@ -23,7 +24,9 @@ const SCENE_DESC = {
   mystic:  '灵气氤氲 · 异界之门'
 };
 
-const MAX_ACTIONS_PER_DAY = 8;
+const MAX_ACTIONS_PER_DAY = 6;
+const MORNING_ACTIONS = 3;
+const AFTERNOON_ACTIONS = 3;
 
 export default function GameScreen() {
   const {
@@ -33,11 +36,13 @@ export default function GameScreen() {
   } = useGame();
 
   const msgEnd = useRef(null);
-  const isNight = state.period === 4;
-  const nightBlocked = isNight && !state.activeStoryline; // 夜晚且无特殊剧情 → 锁定
-  const actionBlocked = state.actionsToday >= MAX_ACTIONS_PER_DAY || !!pendingEvent || nightBlocked;
-  const timeLabel = TIME_PERIODS[state.period];
-  const periodKey = state.period;
+  // v3 time: 上午3 + 下午3, then night settlement
+  const periodLabel = state.period === 1 ? '上午' : state.period === 2 ? '下午' : TIME_PERIODS[state.period];
+  const actionsLeft = state.period === 1 ? state.midDayActions : state.period === 2 ? state.afternoonActions : 0;
+  const isDaytime = state.period === 1 || state.period === 2;
+  const isNight = state.period === 4 || state.isNightSettlement;
+  const nightBlocked = isNight && !state.activeStoryline;
+  const actionBlocked = state.actionsToday >= MAX_ACTIONS_PER_DAY || !!pendingEvent || nightBlocked || state.isNightSettlement;
 
   const msgAreaRef = useRef(null);
   const [showShop, setShowShop] = useState(false);
@@ -72,6 +77,7 @@ export default function GameScreen() {
         { text: '选择一个行动开始吧。切换地点探索不同的剧情。', cls: 'system', id: 3 },
       ];
       setRenderedMsgs(msgs);
+      dispatch({ type:'SET_STATE', payload:{ period:1, midDayActions:3, afternoonActions:3, isNightSettlement:false } });
     }
   }, [state.name]);
 
@@ -228,19 +234,51 @@ export default function GameScreen() {
     setPendingEvent(evt);
   }, [pushMsg]);
 
+  // Enter night mode
+  const enterNight = useCallback(() => {
+    dispatch({ type:'ENTER_NIGHT' });
+    pushMsg('🌙 夜幕降临，今日的行动已全部结束。', 'system');
+    // Trigger night event
+    const pool = nightEvents.filter(() => Math.random() < 0.4);
+    const ev = pool.length > 0 ? pool[Math.floor(Math.random()*pool.length)] : nightEvents[Math.floor(Math.random()*nightEvents.length)];
+    if (ev) {
+      dispatch({ type:'NIGHT_RESULT', result:ev });
+      if (ev.isSpecial) pushMsg(`✨ ${ev.title}`, 'magic');
+      pushMsg(ev.text, 'story');
+    }
+  }, [dispatch, pushMsg]);
+
   const doAction = useCallback((locAction) => {
     click();
     initAudio();
 
-    // Night restriction — only rest allowed, unless in a storyline
-    if (isNight && locAction !== 'rest' && !state.activeStoryline) {
-      pushMsg('🌙 夜深了，该休息了。只有在特殊剧情中才能夜间行动。', 'failure');
+    // Night settlement mode - only "enter new day" allowed
+    if (state.isNightSettlement) {
+      if (locAction === 'newDay') {
+        dispatch({ type:'ADVANCE_DAY' });
+        pushMsg('☀️ 新的一天开始了！', 'system');
+        pushMsg(`📍 第${state.day+1}天 · 上午 · 剩余3/6行动`, 'system');
+        dispatch({ type:'CHECK_MILESTONE' });
+        return;
+      }
+      pushMsg('请先完成夜晚结算，点击"进入新的一天"。', 'failure');
       return;
     }
 
-    // Daily action limit
-    if (state.actionsToday >= MAX_ACTIONS_PER_DAY) {
-      pushMsg('今日已劳累过度，请休息或等待明日再行动。', 'failure');
+    // Night blocked
+    if (isNight && locAction !== 'rest') {
+      pushMsg('🌙 夜深了，只能休息。', 'failure');
+      return;
+    }
+
+    // Action limit for daytime
+    if (!isDaytime && locAction !== 'rest' && locAction !== 'newDay') {
+      pushMsg('当前时段不能执行此操作。', 'failure');
+      return;
+    }
+
+    if (state.actionsToday >= MAX_ACTIONS_PER_DAY && locAction !== 'rest') {
+      pushMsg('今日行动已用完，休息进入夜晚结算。', 'failure');
       return;
     }
 
@@ -250,11 +288,14 @@ export default function GameScreen() {
 
     const actionMessages = {
       rest:       () => {
-        if (isNight) pushMsg('🌙 夜深人静，你安然入睡。一夜好眠后精力充沛。', 'story');
-        else pushMsg('你在家中休息，恢复了精力。', 'story');
+        if (state.period === 4 || state.isNightSettlement) {
+          pushMsg('🌙 夜深人静，你安然入睡。', 'story');
+          dispatch({ type:'SET_ENERGY', delta:25 });
+          enterNight();
+          return;
+        }
+        pushMsg('你在家中休息，恢复了精力。', 'story');
         dispatch({ type:'SET_ENERGY', delta:25 });
-        // At night, rest advances to next morning
-        if (isNight) advanceTime(1);
       },
       study_room: () => { pushMsg('你在书阁翻阅古籍，安安静静地读了一会儿书。(智力+1)', 'success'); dispatch({ type:'UPDATE_ATTRS', changes:{intelligence:Math.min(10,state.attrs.intelligence+1)} }); },
       garden:     () => {
@@ -311,23 +352,44 @@ export default function GameScreen() {
       actionMessages[locAction]();
     }
 
+    // Use action & advance time
+    dispatch({ type:'USE_ACTION' });
+    // Track action type for titles
+    dispatch({ type:'SET_STATE', payload:{ actionCounts:{...state.actionCounts, [locAction]:(state.actionCounts[locAction]||0)+1} } });
+
     if (!pendingEvent) {
+      // Check if night should trigger (actions exhausted)
+      const newActionsLeft = state.period === 1 ? state.midDayActions - 1 : state.period === 2 ? state.afternoonActions - 1 : 0;
+      if (newActionsLeft <= 0 && (state.period === 1 || state.period === 2)) {
+        if (state.period === 1) {
+          pushMsg('🌤️ 上午的3次行动已用完，进入下午。', 'system');
+        } else if (state.afternoonActions <= 1) {
+          // Last afternoon action → trigger night
+          setTimeout(() => enterNight(), 500);
+          return;
+        }
+      }
+      // Advance period based on actions left
       advanceTime(1);
-      // Check for storylines first (higher priority)
+      // Check for storylines
       const sl = checkForStorylines();
       if (sl) {
         dispatch({ type: 'START_STORYLINE', id: sl.id });
-      } else if (Math.random() < 0.25) {
+      } else if (Math.random() < 0.2) {
         const e = triggerRandomEvent(state.location);
         if (e) triggerEvent(e);
       }
+      // Main progress: each action +1
+      dispatch({ type:'ADD_MAIN_PROGRESS', amount:1 });
     }
   }, [state, click, initAudio, pendingEvent, skillCheck, applyEffects, advanceTime, triggerRandomEvent, dispatch, checkEndings, pushMsg, triggerEvent]);
 
   const moveTo = useCallback((locId) => {
     if (state.location === locId) return;
-    if (isNight && !state.activeStoryline) { pushMsg('🌙 夜深不宜外出，明早再出发吧。', 'failure'); return; }
-    if (state.actionsToday >= MAX_ACTIONS_PER_DAY) { pushMsg('今日已劳累过度，无法移动。', 'failure'); return; }
+    if (state.isNightSettlement) { pushMsg('请先完成夜晚结算。', 'failure'); return; }
+    if (isNight && !state.activeStoryline) { pushMsg('🌙 夜深不宜外出。', 'failure'); return; }
+    if (!isDaytime) { pushMsg('当前时段不能移动。', 'failure'); return; }
+    if (state.actionsToday >= MAX_ACTIONS_PER_DAY) { pushMsg('今日行动已用完。', 'failure'); return; }
     click();
     dispatch({ type: 'SET_LOCATION', loc: locId });
     pushMsg(`来到了【${LOCATIONS[locId].name}】。${LOCATIONS[locId].desc}`, 'system');
@@ -374,10 +436,44 @@ export default function GameScreen() {
       </div>
 
       {/* Message Area */}
-      {/* Night warning */}
-      {nightBlocked && (
+      {/* Night settlement panel */}
+      {state.isNightSettlement && (
+        <div style={{ background:'linear-gradient(180deg, rgba(123,94,167,0.3), rgba(26,26,46,0.9))', padding:'10px 14px', borderBottom:'2px solid rgba(123,94,167,0.3)' }}>
+          <div style={{ textAlign:'center', color:'#d4a574', fontWeight:'bold', fontSize:14, marginBottom:6 }}>🌙 第{state.day}天结束 · 夜间结算</div>
+          <div style={{ fontSize:12, color:'#b8a88a', lineHeight:1.8 }}>
+            {state.nightEventResult && <div>📌 {state.nightEventResult.title}</div>}
+            <div>💰 今日金币: {state.prevGold} → {state.gold} ({state.gold-state.prevGold>=0?'+':''}{state.gold-state.prevGold})</div>
+            {Object.entries(ATTR_NAMES).map(([k,n])=>{
+              const diff = state.attrs[k] - (state.prevAttrs[k]||0);
+              if (diff !== 0) return <div key={k}>{ATTR_ICONS[k]} {n}: {state.prevAttrs[k]||0} → {state.attrs[k]} ({diff>0?'+':''}{diff})</div>;
+              return null;
+            })}
+            <div>📜 主线进度: {state.mainProgress}%</div>
+            {state.milestones.length > 0 && <div>🏆 里程碑: {state.milestones.length}个</div>}
+            <div style={{ color:'#e8c9a0', marginTop:4 }}>💡 明日预告: {state.mainProgress<20?'继续积累声望与实力':state.mainProgress<40?'家族/科举关键节点临近':state.mainProgress<60?'重大转折即将到来':state.mainProgress<80?'最终考验在即':'结局近在眼前'}</div>
+          </div>
+          <Button block type="primary" size="small" onClick={()=>{click();doAction('newDay');}} style={{ marginTop:8 }}>
+            ☀️ 进入新的一天 (第{state.day+1}天)
+          </Button>
+          <div style={{ display:'flex', gap:4, marginTop:4 }}>
+            <Button size="small" onClick={()=>{click();setShowSave(true);}}>💾 存档</Button>
+            <Button size="small" onClick={()=>{click();setShowSettings(true);}}>⚙️ 设置</Button>
+            <Button size="small" onClick={()=>{
+              const tpl = prompt('计划模板: 1=全天学习 2=全天社交 3=全天打工 4=取消');
+              if (tpl==='1') dispatch({type:'SET_PLAN',plan:'study'});
+              else if (tpl==='2') dispatch({type:'SET_PLAN',plan:'social'});
+              else if (tpl==='3') dispatch({type:'SET_PLAN',plan:'work'});
+              else dispatch({type:'SET_PLAN',plan:null});
+              pushMsg(tpl&&tpl!=='4'?`📋 明日计划已设定`:'📋 计划已取消','system');
+            }}>📋 计划</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Night warning for daytime night period */}
+      {isNight && !state.isNightSettlement && (
         <div style={{ background:'rgba(123,94,167,0.3)', color:'#b8a0d8', textAlign:'center', padding:'6px', fontSize:12, borderBottom:'1px solid rgba(123,94,167,0.3)' }}>
-          🌙 夜深了 — 只能休息或处理特殊剧情。点击「😴休息💤」入睡。
+          🌙 夜晚模式 — 点击「😴休息」进行夜间结算
         </div>
       )}
 
@@ -409,32 +505,46 @@ export default function GameScreen() {
           <span>💰{state.gold}</span>
           <span>⚡{state.energy}</span>
           <span>📅第{state.day}天</span>
-          <span>🕐{TIME_PERIODS[state.period]}</span>
+          <span>🕐{periodLabel}{isDaytime?` (剩${actionsLeft}次)`:` 结算`}</span>
           <span>💪{attrs.physique}</span>
           <span>📖{attrs.intelligence}</span>
           <span>💐{attrs.charm}</span>
           <span>🍀{attrs.luck}</span>
           <span>🕸️{attrs.cunning}</span>
           {state.transmuted && <span>🔮{attrs.magic||0}</span>}
-          {state.transmuteProgress > 0 && <span style={{color:'#7b5ea7'}}>⏳{state.transmuteProgress}/8</span>}
+        </div>
+        {/* Main quest progress bar */}
+        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 8px', fontSize:10, color:'#d4a574' }}>
+          <span>📜主线</span>
+          <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.1)', borderRadius:3, overflow:'hidden' }}>
+            <div style={{ height:'100%', width:`${state.mainProgress}%`, background:'linear-gradient(90deg,#c44d4d,#d4a574,#7b5ea7)', borderRadius:3, transition:'width 0.5s' }} />
+          </div>
+          <span style={{ fontWeight:'bold' }}>{state.mainProgress}%</span>
+          {state.milestones.length > 0 && <span>🏆×{state.milestones.length}</span>}
         </div>
 
         <div className="action-row">
-          {LOCATIONS[state.location]?.actions.map(a => {
-            const labels = { rest:'😴休息', study_room:'📖书阁', garden:'🌸花园', family_hall:'🏠正厅',
-              attend_class:'📚上课', library:'📚藏书阁', debate:'🗣️辩论', tea_room:'🍵茶室',
-              shop:'🛒商店', tea_house:'🍵茶馆', gamble:'🎲赌坊', street_wander:'🚶闲逛',
-              handle_cases:'⚖️审案', court_meeting:'👑上朝', bribe:'🎁打点', review:'📜卷宗',
-              meditate:'🧘冥想', magic_training:'🔮训练', dungeon:'⚔️地下城', summon:'✨召唤' };
-            const isRest = a === 'rest';
-            const blocked = isRest ? false : actionBlocked;
-            return <Button key={a} size="small" disabled={blocked} onClick={()=>doAction(a)}>
-              {labels[a]||a}{isRest && nightBlocked ? '💤' : ''}
-            </Button>;
-          })}
-          <Button size="small" type="primary" disabled={actionBlocked} onClick={()=>{click();setShowInv(true);}}>🎒背包</Button>
-          <Button size="small" type="dashed" disabled={actionBlocked} onClick={()=>{click();setShowNPC(true);}}>💕人际</Button>
-          <Button size="small" disabled={actionBlocked} onClick={()=>{click();setShowAttr(true);}}>📊属性</Button>
+          {state.isNightSettlement ? (
+            <Button size="small" type="primary" onClick={()=>{click();doAction('newDay');}}>☀️ 进入第{state.day+1}天</Button>
+          ) : (
+            <>
+              {LOCATIONS[state.location]?.actions.map(a => {
+                const labels = { rest:'😴休息', study_room:'📖书阁', garden:'🌸花园', family_hall:'🏠正厅',
+                  attend_class:'📚上课', library:'📚藏书阁', debate:'🗣️辩论', tea_room:'🍵茶室',
+                  shop:'🛒商店', tea_house:'🍵茶馆', gamble:'🎲赌坊', street_wander:'🚶闲逛',
+                  handle_cases:'⚖️审案', court_meeting:'👑上朝', bribe:'🎁打点', review:'📜卷宗',
+                  meditate:'🧘冥想', magic_training:'🔮训练', dungeon:'⚔️地下城', summon:'✨召唤' };
+                const isRest = a === 'rest';
+                const blocked = isRest ? false : (actionBlocked || !isDaytime);
+                return <Button key={a} size="small" disabled={blocked} onClick={()=>doAction(a)}>
+                  {labels[a]||a}{(isRest && (isNight||state.isNightSettlement)) ? '💤' : ''}
+                </Button>;
+              })}
+              <Button size="small" type="primary" disabled={actionBlocked||!isDaytime} onClick={()=>{click();setShowInv(true);}}>🎒背包</Button>
+              <Button size="small" type="dashed" disabled={actionBlocked||!isDaytime} onClick={()=>{click();setShowNPC(true);}}>💕人际</Button>
+              <Button size="small" disabled={actionBlocked||!isDaytime} onClick={()=>{click();setShowAttr(true);}}>📊属性</Button>
+            </>
+          )}
           <Button size="small" onClick={()=>{click();setShowSave(true);}}>💾存档</Button>
           <Button size="small" onClick={()=>{click();setShowSettings(true);}}>⚙️</Button>
         </div>
@@ -442,7 +552,7 @@ export default function GameScreen() {
         <div className="loc-row">
           {visibleLocs.map(([id, loc]) => (
             <button key={id} className={`loc-tab${state.location===id?' active':''}`}
-              disabled={nightBlocked || !!pendingEvent}
+              disabled={nightBlocked || !!pendingEvent || state.isNightSettlement || !isDaytime}
               onClick={()=>moveTo(id)}>
               {loc.icon} {loc.name}
             </button>
